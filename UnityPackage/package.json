@@ -1,0 +1,18 @@
+{
+  "name": "com.mortoc.terrain",
+  "displayName": "Toc Terrain",
+  "version": "0.0.1",
+  "unity": "2022.2",
+  "keywords": [
+    "terrain",
+    "hdrp",
+    "urp"
+  ],
+  "category": "3D",
+  "description": "Efficient planet-scale GPU terrain system",
+  "dependencies": {
+    "com.unity.mathematics": "1.2.1",
+    "com.unity.burst": "1.7.3",
+    "com.unity.render-pipelines.core": "14.0.4"
+  }
+}

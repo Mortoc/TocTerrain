@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 91634c2577ae261439e1702fefc743e6
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - InitialMesh: {fileID: -9030152092583849390, guid: 0b41243222fc5f14b94d294fdc38b792,
+      type: 3}
+  - LODKernel: {fileID: 7200000, guid: 32b2c84d7ea2622439494f15e6a6c6b3, type: 3}
+  - RenderKernel: {fileID: 7200000, guid: faa662c5fcf54f3eb77927b5dc45084a, type: 3}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

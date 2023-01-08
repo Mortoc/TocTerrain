@@ -1,0 +1,47 @@
+#pragma kernel PlanetMeshLodKernel
+#pragma kernel PlanetMeshRenderKernel
+
+#include "TocTesselation.hlsl"
+
+// LOD Kernel
+[numthreads(16,1,1)]
+void PlanetMeshLodKernel (uint3 id : SV_DispatchThreadID)
+{
+    uint primId = id.x;
+
+    // Thread groups are coarse, so the last group will most likely go past the Index list
+    uint primCount, stride; IndicesIn.GetDimensions(primCount, stride);
+    if (primId >= primCount)
+    {
+        return;
+    }
+
+    // Get the input coarse triangle associated with this key
+    float3 vertsIn[3] = 
+    {
+        VertsIn[IndicesIn[primId * 3 + 0]],
+        VertsIn[IndicesIn[primId * 3 + 1]],
+        VertsIn[IndicesIn[primId * 3 + 2]]
+    };
+
+    // Compute LOD
+    uint key = SubDBufferIn[primId];
+    float3 subdVerts[3];
+    Subdivide(key, vertsIn, subdVerts);
+    float z = distance((subdVerts[0] + subdVerts[1]) / 2.0, GetPrimaryCameraPosition());
+    int targetLod = int(DistanceToLod(z, TargetPixelSize));
+
+    // TODO: Frustum Cull
+    // TODO: Other types of culling?
+    
+    // Write subdivision results
+    UpdateSubDBuffer(key, targetLod);
+}
+
+
+// Render Kernel
+[numthreads(16,1,1)]
+void PlanetMeshRenderKernel (uint3 id : SV_DispatchThreadID)
+{
+
+}

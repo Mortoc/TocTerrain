@@ -1,0 +1,58 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+float3 TriNormal(float3 a, float3 b, float3 c)
+{
+    return normalize(cross(b - a, b - c));
+}
+
+float3 TriCenter(float3 a, float3 b, float3 c)
+{
+    return (a + b + c) / 3.0f;
+}
+
+float2 TriCenter(float2 a, float2 b, float2 c)
+{
+    return (a + b + c) / 3.0f;
+}
+
+
+struct SourceVertex
+{
+    float3 positionOS;
+    float3 normalOS;
+    float2 uv;
+};
+
+struct DrawVertex
+{
+    float3 positionWS;
+    float3 normalWS;
+    float2 uv;
+};
+
+struct DrawTriangle
+{
+    DrawVertex vertices[3];
+};
+
+StructuredBuffer<SourceVertex> SourceVertices;
+StructuredBuffer<int> SourceTriangles;
+AppendStructuredBuffer<DrawTriangle> DrawTriangles;
+
+[numthreads(128,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x > SourceTriangleCount)
+    {
+        return;
+    }
+
+    int triStart = id.x * 3;
+    DrawVertex inputs[3];
+    for (int i = 0; i < 3; i++)
+    {
+        int vertIdx = SourceTriangles[triStart + i];
+        inputs[i] = TransformToWorldSpace(SourceVertices[vertIdx]);
+    }
+}

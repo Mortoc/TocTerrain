@@ -1,0 +1,18 @@
+{
+    "name": "Mortoc.Terrain.Editor",
+    "rootNamespace": "TocTerrain.EditorTools",
+    "references": [
+        "GUID:2e4bff02161a71e499fd0113945e4b26"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

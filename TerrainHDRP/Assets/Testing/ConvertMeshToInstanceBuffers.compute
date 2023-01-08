@@ -1,0 +1,49 @@
+#pragma kernel CSMain
+#pragma enable_d3d11_debug_symbols
+
+#include "Packages/com.mortoc.terrain/Runtime/Shaders/GeneratedVertex.cs.hlsl"
+
+// Input
+float4x4 Transform;
+StructuredBuffer<float3> VertsIn;
+StructuredBuffer<float3> NormsIn;
+StructuredBuffer<float2> UVsIn;
+StructuredBuffer<uint> IndicesIn;
+uint TriangleCount;
+
+// Output
+RWStructuredBuffer<GeneratedVertex> VertsOut;
+
+
+[numthreads(64,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= TriangleCount)
+    {
+        return;
+    }
+    
+    const uint triIdx = id.x * 3;
+    uint3 vertIdx = uint3(
+        IndicesIn[triIdx + 0],
+        IndicesIn[triIdx + 1],
+        IndicesIn[triIdx + 2]
+    );
+
+    const uint outIdx = triIdx * 3;
+    const float3 threadColor = float3(id.x / 1000.0f, 0.2, 0.2);
+    VertsOut[outIdx + 0].Position = VertsIn[vertIdx.x];
+    VertsOut[outIdx + 0].Normal = NormsIn[vertIdx.x];
+    VertsOut[outIdx + 0].Color = threadColor;
+    VertsOut[outIdx + 0].UV = UVsIn[vertIdx.x];
+    
+    VertsOut[outIdx + 1].Position = VertsIn[vertIdx.y];
+    VertsOut[outIdx + 1].Normal = NormsIn[vertIdx.y];
+    VertsOut[outIdx + 1].Color = threadColor;
+    VertsOut[outIdx + 1].UV = UVsIn[vertIdx.y];
+    
+    VertsOut[outIdx + 2].Position = VertsIn[vertIdx.z];
+    VertsOut[outIdx + 2].Normal = NormsIn[vertIdx.z];
+    VertsOut[outIdx + 1].Color = threadColor;
+    VertsOut[outIdx + 2].UV = UVsIn[vertIdx.z];
+}
