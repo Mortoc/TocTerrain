@@ -13,9 +13,10 @@ uint TriangleCount;
 
 // Output
 RWStructuredBuffer<GeneratedVertex> VertsOut;
+RWStructuredBuffer<uint> TriangleCounter;
 
 
-[numthreads(64,1,1)]
+[numthreads(1,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
     if (id.x >= TriangleCount)
@@ -23,15 +24,20 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         return;
     }
     
-    const uint triIdx = id.x * 3;
+    uint triIdx = id.x * 3;
+
+    float3 threadColor = lerp(
+        float3(0.95, 0.05, 0.0),
+        float3(0.05, 0.95, 0.0),
+        id.x / (float)TriangleCount
+    );
     uint3 vertIdx = uint3(
         IndicesIn[triIdx + 0],
         IndicesIn[triIdx + 1],
         IndicesIn[triIdx + 2]
     );
 
-    const uint outIdx = triIdx * 3;
-    const float3 threadColor = float3(id.x / 1000.0f, 0.2, 0.2);
+    uint outIdx = triIdx;
     VertsOut[outIdx + 0].Position = VertsIn[vertIdx.x];
     VertsOut[outIdx + 0].Normal = NormsIn[vertIdx.x];
     VertsOut[outIdx + 0].Color = threadColor;
@@ -44,6 +50,9 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     
     VertsOut[outIdx + 2].Position = VertsIn[vertIdx.z];
     VertsOut[outIdx + 2].Normal = NormsIn[vertIdx.z];
-    VertsOut[outIdx + 1].Color = threadColor;
+    VertsOut[outIdx + 2].Color = threadColor;
     VertsOut[outIdx + 2].UV = UVsIn[vertIdx.z];
+
+    InterlockedMax(TriangleCounter[0], outIdx + 2);
+    //InterlockedAdd(TriangleCounter[0], 1u);
 }

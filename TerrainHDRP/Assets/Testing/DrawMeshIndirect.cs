@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using TocTerrain;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
@@ -21,6 +22,7 @@ public class DrawMeshIndirect : MonoBehaviour
     private GraphicsBuffer _coarseIndicesBuffer;
     private GraphicsBuffer _finalVertDataOut;
     private GraphicsBuffer _drawArgsBuffer;
+    private GraphicsBuffer _triangleCounter;
     private int _triangleCount;
     
     private GeneratedVertex[] _finalVertDataOutCpuBuffer;
@@ -33,6 +35,7 @@ public class DrawMeshIndirect : MonoBehaviour
         public static readonly int IndicesIn = Shader.PropertyToID("IndicesIn");
         public static readonly int VertsOut = Shader.PropertyToID("VertsOut");
         public static readonly int TriangleCount = Shader.PropertyToID("TriangleCount");
+        public static readonly int TriangleCounter = Shader.PropertyToID("TriangleCounter");
         public static readonly int VertData = Shader.PropertyToID("VertData");
     }
 
@@ -106,7 +109,7 @@ public class DrawMeshIndirect : MonoBehaviour
         var drawArgs = new[]
         {
             _singleTriangleMesh.GetIndexCount(0),
-            (uint)_triangleCount,
+            (uint)_triangleCount * 3,
             _singleTriangleMesh.GetIndexStart(0),
             _singleTriangleMesh.GetBaseVertex(0),
             0u
@@ -162,6 +165,15 @@ public class DrawMeshIndirect : MonoBehaviour
         );
         _finalVertDataOut.name = "Vert Data Out";
         _finalVertDataOutCpuBuffer = new GeneratedVertex[_triangleCount * 3];
+        _finalVertDataOut.SetData(_finalVertDataOutCpuBuffer); // clear the output memory
+        
+        // Triangle Counter
+        _triangleCounter = new GraphicsBuffer(
+            GraphicsBuffer.Target.Counter,
+            1,
+            sizeof(uint)
+        );
+        _triangleCounter.SetData(new [] {0u});
         
         // Assign buffers to the compute shader
         _computeShaderCopy.SetBuffer(0, ShaderID.VertsIn, _coarseVertsBuffer);
@@ -169,6 +181,7 @@ public class DrawMeshIndirect : MonoBehaviour
         _computeShaderCopy.SetBuffer(0, ShaderID.UVsIn, _coarseUvsBuffer);
         _computeShaderCopy.SetBuffer(0, ShaderID.IndicesIn, _coarseIndicesBuffer);
         _computeShaderCopy.SetBuffer(0, ShaderID.VertsOut, _finalVertDataOut);
+        _computeShaderCopy.SetBuffer(0, ShaderID.TriangleCounter, _triangleCounter);
         _computeShaderCopy.SetInt(ShaderID.TriangleCount, _triangleCount);
         
         // Assign buffers to the material shader
@@ -179,15 +192,31 @@ public class DrawMeshIndirect : MonoBehaviour
     private void Update()
     {
         // Starting the compute shader during update so it has some time to run before the camera renders
-        _computeShaderCopy.GetKernelThreadGroupSizes(0, out var groupSize, out _, out _);
-        var threadGroupCount = Mathf.CeilToInt(_triangleCount / (float)groupSize);
-        _computeShaderCopy.Dispatch(0, threadGroupCount, 1, 1);
+        // _computeShaderCopy.GetKernelThreadGroupSizes(0, out var groupSize, out _, out _);
+        // var threadGroupCount = Mathf.CeilToInt(_triangleCount / (float)groupSize);
+        // _computeShaderCopy.Dispatch(0, threadGroupCount, 1, 1);
+        Debug.Log($"Updating Mesh with {_triangleCount} dispatch size");
+        _computeShaderCopy.Dispatch(0, _triangleCount, 1, 1);
     }
     
     private void OnBeginCameraRendering(ScriptableRenderContext ctx, Camera camera)
     {
         // Debug read the vert data back to verify it
         _finalVertDataOut.GetData(_finalVertDataOutCpuBuffer);
+        var count = new uint[1];
+        _triangleCounter.GetData(count);
+
+        var vertCount = 0;
+        foreach (var gVert in _finalVertDataOutCpuBuffer)
+        {
+            if (math.length(gVert.Position) > 0.0f)
+            {
+                vertCount++;
+            }
+        }
+        
+        Debug.Log($"Counter: {count[0]}");
+        Debug.Log($"Verts with Data: {vertCount}");
         
         // Draw each final triangle of the mesh
         Graphics.DrawMeshInstancedIndirect(
