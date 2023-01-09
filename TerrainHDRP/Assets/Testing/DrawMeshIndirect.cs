@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
 
 [ExecuteAlways]
-public class DrawMeshIndirect : MonoBehaviour
+public class DrawMeshIndirect : MonoBehaviour, ISerializationCallbackReceiver
 {
     public Mesh SourceMesh;
     public Material Material;
@@ -22,6 +22,7 @@ public class DrawMeshIndirect : MonoBehaviour
     private GraphicsBuffer _coarseIndicesBuffer;
     private GraphicsBuffer _finalVertDataOut;
     private GraphicsBuffer _drawArgsBuffer;
+    private uint[] _drawArgs;
     private GraphicsBuffer _triangleCounter;
     private int _triangleCount;
     
@@ -35,7 +36,7 @@ public class DrawMeshIndirect : MonoBehaviour
         public static readonly int IndicesIn = Shader.PropertyToID("IndicesIn");
         public static readonly int VertsOut = Shader.PropertyToID("VertsOut");
         public static readonly int TriangleCount = Shader.PropertyToID("TriangleCount");
-        public static readonly int TriangleCounter = Shader.PropertyToID("TriangleCounter");
+        public static readonly int DrawArgs = Shader.PropertyToID("DrawArgs");
         public static readonly int VertData = Shader.PropertyToID("VertData");
     }
 
@@ -106,10 +107,10 @@ public class DrawMeshIndirect : MonoBehaviour
         {
             SafeDestroy.Buffer(_drawArgsBuffer);
         }
-        var drawArgs = new[]
+        _drawArgs = new[]
         {
             _singleTriangleMesh.GetIndexCount(0),
-            (uint)_triangleCount * 3,
+            (uint)_triangleCount * 3, // set by the compute shader
             _singleTriangleMesh.GetIndexStart(0),
             _singleTriangleMesh.GetBaseVertex(0),
             0u
@@ -117,9 +118,9 @@ public class DrawMeshIndirect : MonoBehaviour
         _drawArgsBuffer = new GraphicsBuffer(
             GraphicsBuffer.Target.IndirectArguments,
             1, 
-            drawArgs.Length * sizeof(uint)
+            _drawArgs.Length * sizeof(uint)
         );
-        _drawArgsBuffer.SetData(drawArgs);
+        _drawArgsBuffer.SetData(_drawArgs);
         
         // verts
         _coarseVertsBuffer = new GraphicsBuffer(
@@ -166,22 +167,19 @@ public class DrawMeshIndirect : MonoBehaviour
         _finalVertDataOut.name = "Vert Data Out";
         _finalVertDataOutCpuBuffer = new GeneratedVertex[_triangleCount * 3];
         _finalVertDataOut.SetData(_finalVertDataOutCpuBuffer); // clear the output memory
-        
-        // Triangle Counter
-        _triangleCounter = new GraphicsBuffer(
-            GraphicsBuffer.Target.Counter,
-            1,
-            sizeof(uint)
-        );
-        _triangleCounter.SetData(new [] {0u});
-        
+
+        AssignBuffersToShaders();
+    }
+
+    private void AssignBuffersToShaders()
+    {
         // Assign buffers to the compute shader
         _computeShaderCopy.SetBuffer(0, ShaderID.VertsIn, _coarseVertsBuffer);
         _computeShaderCopy.SetBuffer(0, ShaderID.NormsIn, _coarseNormsBuffer);
         _computeShaderCopy.SetBuffer(0, ShaderID.UVsIn, _coarseUvsBuffer);
         _computeShaderCopy.SetBuffer(0, ShaderID.IndicesIn, _coarseIndicesBuffer);
         _computeShaderCopy.SetBuffer(0, ShaderID.VertsOut, _finalVertDataOut);
-        _computeShaderCopy.SetBuffer(0, ShaderID.TriangleCounter, _triangleCounter);
+        _computeShaderCopy.SetBuffer(0, ShaderID.DrawArgs, _drawArgsBuffer);
         _computeShaderCopy.SetInt(ShaderID.TriangleCount, _triangleCount);
         
         // Assign buffers to the material shader
@@ -203,8 +201,8 @@ public class DrawMeshIndirect : MonoBehaviour
     {
         // Debug read the vert data back to verify it
         _finalVertDataOut.GetData(_finalVertDataOutCpuBuffer);
-        var count = new uint[1];
-        _triangleCounter.GetData(count);
+        var drawArgs = new uint[5];
+        // _triangleCounter.GetData(count);
 
         var vertCount = 0;
         foreach (var gVert in _finalVertDataOutCpuBuffer)
@@ -215,8 +213,13 @@ public class DrawMeshIndirect : MonoBehaviour
             }
         }
         
-        Debug.Log($"Counter: {count[0]}");
-        Debug.Log($"Verts with Data: {vertCount}");
+        //Debug.Log($"Counter: {count[0]}");
+        Debug.Log(
+     $"Buffers Valid: {_coarseVertsBuffer.IsValid() && _coarseIndicesBuffer.IsValid() && _finalVertDataOut.IsValid()} | " +
+            $"Tri Count: {_triangleCount} | " +
+            $"Draw Args {_drawArgs[0]}, {_drawArgs[1]}, {_drawArgs[2]}, {_drawArgs[3]}, {_drawArgs[4]} | " +
+            $"Verts with Data: {vertCount}"
+        );
         
         // Draw each final triangle of the mesh
         Graphics.DrawMeshInstancedIndirect(
@@ -234,5 +237,16 @@ public class DrawMeshIndirect : MonoBehaviour
             LightProbeUsage.BlendProbes,
             null
         );
+    }
+
+    public void OnBeforeSerialize()
+    {
+        // Saving the scene un-assigns all the buffers from the shaders for some reason
+        AssignBuffersToShaders();
+    }
+
+    public void OnAfterDeserialize()
+    {
+        AssignBuffersToShaders();
     }
 }

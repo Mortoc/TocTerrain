@@ -13,7 +13,7 @@ uint TriangleCount;
 
 // Output
 RWStructuredBuffer<GeneratedVertex> VertsOut;
-RWStructuredBuffer<uint> TriangleCounter;
+RWStructuredBuffer<uint> DrawArgs;
 
 
 [numthreads(1,1,1)]
@@ -53,6 +53,5 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     VertsOut[outIdx + 2].Color = threadColor;
     VertsOut[outIdx + 2].UV = UVsIn[vertIdx.z];
 
-    InterlockedMax(TriangleCounter[0], outIdx + 2);
-    //InterlockedAdd(TriangleCounter[0], 1u);
+    InterlockedAdd(DrawArgs[1], 1u);
 }
