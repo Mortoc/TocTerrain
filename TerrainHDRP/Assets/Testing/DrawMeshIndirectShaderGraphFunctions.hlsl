@@ -5,11 +5,12 @@
 #include "Packages/com.mortoc.terrain/Runtime/Shaders/GeneratedVertex.cs.hlsl"
 
 StructuredBuffer<GeneratedVertex> VertData;
-StructuredBuffer<uint> _PerInstanceData;
+StructuredBuffer<uint2> _PerInstanceData;
 
 #if UNITY_ANY_INSTANCING_ENABLED
 
-	void VertInstancingSetup() {
+	void VertInstancingSetup()
+	{
 		// There's an example for setting the local matrix in the file:
 		// https://github.com/Unity-Technologies/Graphics/blob/master/Packages/com.unity.shadergraph/Editor/Generation/Targets/BuiltIn/ShaderLibrary/ParticlesInstancing.hlsl
 		// VertInstancingMatrices(unity_ObjectToWorld, unity_WorldToObject);

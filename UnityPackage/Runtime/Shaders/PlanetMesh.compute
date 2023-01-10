@@ -1,7 +1,7 @@
 #pragma kernel PlanetMeshLodKernel
 #pragma kernel PlanetMeshRenderKernel
 
-#include "TocTesselation.hlsl"
+#include "TessellatedMesh.hlsl"
 
 // LOD Kernel
 [numthreads(16,1,1)]

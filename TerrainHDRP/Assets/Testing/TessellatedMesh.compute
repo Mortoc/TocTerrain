@@ -1,0 +1,151 @@
+#pragma kernel LodKernel
+// #pragma kernel BuildDrawBuffersKernel
+#pragma enable_d3d11_debug_symbols
+
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
+#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/GeometricTools.hlsl"
+#include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariables.hlsl"
+#include "Packages/com.unity.render-pipelines.high-definition/Runtime/Core/Utilities/GeometryUtils.cs.hlsl"
+#include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/FrustumCulling.hlsl"
+
+#include "Packages/com.mortoc.terrain/Runtime/Shaders/GeneratedVertex.cs.hlsl"
+
+// Input
+float4x4 Transform;
+float DisplacementScale;
+StructuredBuffer<float3> VertsIn;
+StructuredBuffer<float3> NormsIn;
+StructuredBuffer<float2> UVsIn;
+StructuredBuffer<uint> IndicesIn;
+uint TriangleCount;
+
+StructuredBuffer<FrustumGPU> FrustumData;
+float4 CameraPos;
+
+// Output
+RWStructuredBuffer<GeneratedVertex> VertsOut;
+RWStructuredBuffer<uint> DrawArgs;
+RWStructuredBuffer<uint> DebugCounter;
+
+GeneratedVertex TransformVert(in float3 pos, in float3 norm, in float3 color, in float2 uv)
+{
+    GeneratedVertex v;
+    v.Position = mul(Transform, float4(pos, 1.0)).xyz;
+    v.Normal = mul(Transform, float4(norm, 0.0)).xyz;
+    v.Color = color;
+    v.UV = uv;
+    return v;    
+}
+
+
+// Builds an OBB around the displacement volume for frustum culling.
+// The area the triangle can be displaced to can be represented by a triangle extruded to `DisplacementScale` height.
+OrientedBBox DisplacementBounds(in GeneratedVertex vert0, in GeneratedVertex vert1, in GeneratedVertex vert2)
+{
+    OrientedBBox bbox;
+    bbox.center = (vert0.Position + vert1.Position + vert2.Position) / 3.0;
+    bbox.right = vert1.Position - vert0.Position;
+    bbox.extentX = length(bbox.right);
+    float3 zVec = vert2.Position - vert0.Position;
+    bbox.up = normalize(cross(bbox.right, zVec));
+    // displacement is centered on the triangle position, move the OBB down to the lowest possible displacement 
+    bbox.center -= DisplacementScale * bbox.up;
+    bbox.extentY = DisplacementScale;
+    bbox.extentZ = length(zVec);
+    return bbox;    
+}
+
+bool CoarseCull(in GeneratedVertex vert0, in GeneratedVertex vert1, in GeneratedVertex vert2)
+{
+    // Backface culling
+    if (CullTriangleBackFace(vert0.Position, vert1.Position, vert2.Position, -0.05, CameraPos, -1))
+    {
+        return false;
+    }
+    
+    // Frustum Culling
+    const OrientedBBox displacementBounds = DisplacementBounds(vert0, vert1, vert2);
+    if(FrustumOBBIntersection(displacementBounds, FrustumData[0]))
+    {
+        return false;
+    }
+
+    // TODO: Planet Surface occlusion culling
+    return true;
+}
+
+[numthreads(1,1,1)]
+void LodKernel(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= TriangleCount)
+    {
+        return;
+    }
+    
+    uint triIdx = id.x * 3;
+
+    float3 threadColor = lerp(
+        float3(0.95, 0.05, 0.0),
+        float3(0.05, 0.95, 0.0),
+        id.x / (float)TriangleCount
+    );
+    uint3 vertIdx = uint3(
+        IndicesIn[triIdx + 0],
+        IndicesIn[triIdx + 1],
+        IndicesIn[triIdx + 2]
+    );
+
+    // Write out the world-space vertices
+    uint outIdx = triIdx;
+    GeneratedVertex vertsIn[3] =
+    {
+        TransformVert(
+            VertsIn[vertIdx.x], 
+            NormsIn[vertIdx.x], 
+            threadColor, 
+            UVsIn[vertIdx.x]
+        ),
+        TransformVert(
+            VertsIn[vertIdx.y], 
+            NormsIn[vertIdx.y], 
+            threadColor, 
+            UVsIn[vertIdx.y]
+        ),
+        TransformVert(
+            VertsIn[vertIdx.z], 
+            NormsIn[vertIdx.z], 
+            threadColor, 
+            UVsIn[vertIdx.z]
+        )
+    };
+
+    // Don't bother to tessellate triangles that when extruded won't affect the camera
+    if (CoarseCull(vertsIn[0], vertsIn[1], vertsIn[2]))
+    {
+        VertsOut[outIdx + 0] = (GeneratedVertex)0;
+        VertsOut[outIdx + 1] = (GeneratedVertex)0;
+        VertsOut[outIdx + 2] = (GeneratedVertex)0;
+        InterlockedAdd(DebugCounter[0], 1u);
+    }
+    else
+    {
+        VertsOut[outIdx + 0] = vertsIn[0];
+        VertsOut[outIdx + 1] = vertsIn[1];
+        VertsOut[outIdx + 2] = vertsIn[2];    
+    }
+   
+    // Compute LOD
+    // uint key = SubDBufferIn[primId];
+    // float3 subdVerts[3];
+    // Subdivide(key, vertsIn, subdVerts);
+    // float z = distance((subdVerts[0] + subdVerts[1]) / 2.0, GetPrimaryCameraPosition());
+    // int targetLod = int(DistanceToLod(z, TargetPixelSize));
+    
+    InterlockedAdd(DrawArgs[1], 1u);
+}
+
+// [numthreads(1,1,1)]
+// void BuildDrawBuffersKernel (uint3 id : SV_DispatchThreadID)
+// {
+//     
+// }

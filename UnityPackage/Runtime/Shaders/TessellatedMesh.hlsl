@@ -1,6 +1,6 @@
 // Terrain Tesselation system based on GPU Zen 2, Adaptive GPU Tessellation with Compute Shaders
-#ifndef TOC_TESSELATION_H
-#define TOC_TESSELATION_H
+#ifndef MORTOC_TESSELLATED_MESH_H
+#define MORTOC_TESSELLATED_MESH_H
 
 #include "GeneratedVertex.cs.hlsl"
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
@@ -8,7 +8,7 @@
 
 float3x3 BitToTransform(const in uint bit)
 {
-    // if the bit is on, returns this matrix:
+    // if the bit is on, this function returns this matrix:
     // -1/2, -1/2,  1/2
     // -1/2,  1/2,  1/2
     //    0,    0,    1
@@ -144,6 +144,7 @@ void UpdateSubDBuffer(const uint key, const int targetLod, inout uint drawArgs[5
         }
     }
 }
+
 
 
 #endif
