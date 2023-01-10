@@ -7,7 +7,6 @@
 StructuredBuffer<GeneratedVertex> VertData;
 StructuredBuffer<uint> _PerInstanceData;
 
-
 #if UNITY_ANY_INSTANCING_ENABLED
 
 	void VertInstancingSetup() {

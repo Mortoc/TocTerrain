@@ -15,6 +15,18 @@ uint TriangleCount;
 RWStructuredBuffer<GeneratedVertex> VertsOut;
 RWStructuredBuffer<uint> DrawArgs;
 
+GeneratedVertex TransformVert(in float3 pos, in float3 norm, in float3 color, in float2 uv)
+{
+    GeneratedVertex v;
+    v.Position = mul(Transform, float4(pos, 1.0)).xyz;
+    v.Normal = mul(Transform, float4(norm, 0.0)).xyz;
+    // v.Position = pos;
+    // v.Normal = norm;
+    v.Color = color;
+    v.UV = uv;
+    return v;    
+}
+
 
 [numthreads(1,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
@@ -38,20 +50,23 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     );
 
     uint outIdx = triIdx;
-    VertsOut[outIdx + 0].Position = VertsIn[vertIdx.x];
-    VertsOut[outIdx + 0].Normal = NormsIn[vertIdx.x];
-    VertsOut[outIdx + 0].Color = threadColor;
-    VertsOut[outIdx + 0].UV = UVsIn[vertIdx.x];
-    
-    VertsOut[outIdx + 1].Position = VertsIn[vertIdx.y];
-    VertsOut[outIdx + 1].Normal = NormsIn[vertIdx.y];
-    VertsOut[outIdx + 1].Color = threadColor;
-    VertsOut[outIdx + 1].UV = UVsIn[vertIdx.y];
-    
-    VertsOut[outIdx + 2].Position = VertsIn[vertIdx.z];
-    VertsOut[outIdx + 2].Normal = NormsIn[vertIdx.z];
-    VertsOut[outIdx + 2].Color = threadColor;
-    VertsOut[outIdx + 2].UV = UVsIn[vertIdx.z];
-
+    VertsOut[outIdx + 0] = TransformVert(
+        VertsIn[vertIdx.x], 
+        NormsIn[vertIdx.x], 
+        threadColor, 
+        UVsIn[vertIdx.x]
+    );
+    VertsOut[outIdx + 1] = TransformVert(
+        VertsIn[vertIdx.y], 
+        NormsIn[vertIdx.y], 
+        threadColor, 
+        UVsIn[vertIdx.y]
+    );
+    VertsOut[outIdx + 2] = TransformVert(
+        VertsIn[vertIdx.z], 
+        NormsIn[vertIdx.z], 
+        threadColor, 
+        UVsIn[vertIdx.z]
+    );
     InterlockedAdd(DrawArgs[1], 1u);
 }

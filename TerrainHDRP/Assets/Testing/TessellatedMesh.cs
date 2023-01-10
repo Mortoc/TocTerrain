@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 using UnityEngine.Rendering.HighDefinition;
 
 [ExecuteAlways]
-public class DrawMeshIndirect : MonoBehaviour, ISerializationCallbackReceiver
+public class TessellatedMesh : MonoBehaviour
 {
     public Mesh SourceMesh;
     public Material Material;
@@ -36,6 +36,7 @@ public class DrawMeshIndirect : MonoBehaviour, ISerializationCallbackReceiver
         public static readonly int IndicesIn = Shader.PropertyToID("IndicesIn");
         public static readonly int VertsOut = Shader.PropertyToID("VertsOut");
         public static readonly int TriangleCount = Shader.PropertyToID("TriangleCount");
+        public static readonly int Transform = Shader.PropertyToID("Transform");
         public static readonly int DrawArgs = Shader.PropertyToID("DrawArgs");
         public static readonly int VertData = Shader.PropertyToID("VertData");
     }
@@ -95,7 +96,6 @@ public class DrawMeshIndirect : MonoBehaviour, ISerializationCallbackReceiver
         
         SafeDestroy.Buffer(_drawArgsBuffer);
         _drawArgsBuffer = null;
-        
     }
     
     private void SetupBuffers()
@@ -173,6 +173,11 @@ public class DrawMeshIndirect : MonoBehaviour, ISerializationCallbackReceiver
 
     private void AssignBuffersToShaders()
     {
+        if (!_computeShaderCopy || !_matCopy)
+        {
+            return;
+        }
+        
         // Assign buffers to the compute shader
         _computeShaderCopy.SetBuffer(0, ShaderID.VertsIn, _coarseVertsBuffer);
         _computeShaderCopy.SetBuffer(0, ShaderID.NormsIn, _coarseNormsBuffer);
@@ -194,6 +199,7 @@ public class DrawMeshIndirect : MonoBehaviour, ISerializationCallbackReceiver
         // var threadGroupCount = Mathf.CeilToInt(_triangleCount / (float)groupSize);
         // _computeShaderCopy.Dispatch(0, threadGroupCount, 1, 1);
         Debug.Log($"Updating Mesh with {_triangleCount} dispatch size");
+        _computeShaderCopy.SetMatrix(ShaderID.Transform, transform.localToWorldMatrix);
         _computeShaderCopy.Dispatch(0, _triangleCount, 1, 1);
     }
     
@@ -239,14 +245,4 @@ public class DrawMeshIndirect : MonoBehaviour, ISerializationCallbackReceiver
         );
     }
 
-    public void OnBeforeSerialize()
-    {
-        // Saving the scene un-assigns all the buffers from the shaders for some reason
-        AssignBuffersToShaders();
-    }
-
-    public void OnAfterDeserialize()
-    {
-        AssignBuffersToShaders();
-    }
 }

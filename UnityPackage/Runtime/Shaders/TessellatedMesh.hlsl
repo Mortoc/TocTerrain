@@ -6,31 +6,6 @@
 #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Common.hlsl"
 #include "Packages/com.unity.render-pipelines.high-definition/Runtime/ShaderLibrary/ShaderVariables.hlsl"
 
-
-// Subdivision Buffers
-StructuredBuffer<uint> SubDBufferIn;
-RWStructuredBuffer<uint> SubDBufferOut;
-uniform RWStructuredBuffer<uint> SubDTriangleCounter;
-
-// Shared Input
-float4x4 PlanetTransform;
-StructuredBuffer<float3> VertsIn;
-StructuredBuffer<float3> NormsIn;
-StructuredBuffer<float2> UVsIn;
-StructuredBuffer<uint> IndicesIn;
-
-// Render Kernel Output
-RWStructuredBuffer<GeneratedVertex> VertsOut;
-
-// LOD Input
-float TargetPixelSize;
-
-// Render Kernel Input
-float PlanetRadius;
-uint2 VertexIndexKey;
-float2 InstancedVertex;
-
-
 float3x3 BitToTransform(const in uint bit)
 {
     // if the bit is on, returns this matrix:
@@ -79,16 +54,16 @@ void ChildrenKeys(const in uint key, out uint children[2])
     children[1] = (key << 1u) | 1u;
 }
 
-void WriteKey(const in uint key)
+void WriteKey(const in uint key, inout uint drawArgs[5], inout uint subdBuffer [])
 {
-    uint idx; InterlockedAdd(SubDTriangleCounter[0], 1u, idx);
-    SubDBufferOut[idx] = key;
+    uint idx; InterlockedAdd(drawArgs[1], 1u, idx);
+    subdBuffer[idx] = key;
 }
 
 // Is this the 0-th child of its parent?
 bool IsChildZeroKey(const in uint key)
 {
-    return key == 0x1u;
+    return key == 1u;
 }
 
 // Returns false if this key is as subdivided as possible
@@ -134,9 +109,8 @@ void Subdivide(const in uint key, const in float3 vertsIn[3], out float3 vertsOu
     vertsOut[2] = Berp(vertsIn, u3);
 }
 
-// Subdivides, keeps or reduces this base-triangle's current subdivision level based
-// on the target LOD
-void UpdateSubDBuffer(const uint key, const int targetLod)
+// Subdivides, keeps or reduces this base-triangle's current subdivision level based on the target LOD
+void UpdateSubDBuffer(const uint key, const int targetLod, inout uint drawArgs[5], inout uint subdBuffer [])
 {
     // update this key
     const int keyLod = firstbithigh(key);
@@ -146,13 +120,13 @@ void UpdateSubDBuffer(const uint key, const int targetLod)
         // Subdivide
         uint children[2];
         ChildrenKeys(key, children);
-        WriteKey(children[0]);
-        WriteKey(children[1]);
+        WriteKey(children[0], drawArgs, subdBuffer);
+        WriteKey(children[1], drawArgs, subdBuffer);
     }
     else if(keyLod == targetLod)
     {
-        // Keep
-        WriteKey(key);
+        // Keep current subd level
+        WriteKey(key, drawArgs, subdBuffer);
     }
     else
     {
@@ -160,13 +134,13 @@ void UpdateSubDBuffer(const uint key, const int targetLod)
         if (IsRootKey(key))
         {
             // Don't try to merge rootKey
-            WriteKey(key);
+            WriteKey(key, drawArgs, subdBuffer);
         }
         else if (IsChildZeroKey(key))
         {
             // Only write the parent key for the 0th child,
             // dropping the other child accomplishes the merge
-            WriteKey(ParentKey(key));
+            WriteKey(ParentKey(key), drawArgs, subdBuffer);
         }
     }
 }
